@@ -13,9 +13,7 @@ import {
   CircularProgress,
   Stack,
   Snackbar,
-  Alert,
-  Divider,
-  IconButton
+  Alert
 } from '@mui/material'
 import UploadFileIcon from '@mui/icons-material/UploadFile'
 import type { SelectChangeEvent } from '@mui/material'
@@ -46,7 +44,7 @@ function App() {
     const fetchStates = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/states');
+        const response = await axios.get('/api/power-plants/states');
         setStates(response.data);
       } catch (err) {
         setError('Failed to fetch states. Please try again later.');
@@ -65,7 +63,7 @@ function App() {
     
     try {
       setLoading(true);
-      const response = await axios.get(`/api/plants?state=${selectedState}&limit=${topN}`);
+      const response = await axios.get(`/api/power-plants?state=${selectedState}&limit=${topN}`);
       setPlants(response.data);
       setError(null);
     } catch (err) {
@@ -105,7 +103,7 @@ function App() {
       setLoading(true);
       setUploadError(null);
       
-      const response = await axios.post('/api/upload', formData, {
+      const response = await axios.post('/api/power-plants/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -115,7 +113,7 @@ function App() {
         setUploadSuccess(true);
         
         // Refresh states list after successful upload
-        const statesResponse = await axios.get('/api/states');
+        const statesResponse = await axios.get('/api/power-plants/states');
         setStates(statesResponse.data);
       }
     } catch (err: any) {

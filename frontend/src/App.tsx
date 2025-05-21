@@ -13,13 +13,17 @@ import {
   CircularProgress,
   Stack,
   Snackbar,
-  Alert
+  Alert,
+  AppBar,
+  Toolbar
 } from '@mui/material'
 import UploadFileIcon from '@mui/icons-material/UploadFile'
 import type { SelectChangeEvent } from '@mui/material'
-import axios from 'axios'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import './App.css'
+import { SignedIn, SignedOut, UserButton, useClerk } from '@clerk/clerk-react'
+import { useNavigate } from 'react-router-dom'
+import { api } from './api'
 
 interface PowerPlant {
   id: string;
@@ -28,7 +32,7 @@ interface PowerPlant {
   netGeneration: number;
 }
 
-function App() {
+function Dashboard() {
   const [plants, setPlants] = useState<PowerPlant[]>([]);
   const [states, setStates] = useState<string[]>([]);
   const [selectedState, setSelectedState] = useState<string>('');
@@ -44,11 +48,23 @@ function App() {
     const fetchStates = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/power-plants/states');
-        setStates(response.data);
-      } catch (err) {
-        setError('Failed to fetch states. Please try again later.');
-        console.error(err);
+        console.log('Fetching states from:', import.meta.env.VITE_API_URL || 'http://localhost:8000');
+        const response = await api.get('/api/power-plants/states');
+        console.log('States API response:', response.data);
+        if (Array.isArray(response.data)) {
+          setStates(response.data);
+          setError(null);
+        } else {
+          setError('Unexpected data format received from the server.');
+          console.error('Expected array but got:', typeof response.data);
+        }
+      } catch (err: any) {
+        console.error('Error fetching states:', err);
+        // More detailed error message
+        setError(`Failed to fetch states: ${err.message || 'Unknown error'}`);
+        if (err.response) {
+          console.error('Error response:', err.response.data);
+        }
       } finally {
         setLoading(false);
       }
@@ -63,7 +79,7 @@ function App() {
     
     try {
       setLoading(true);
-      const response = await axios.get(`/api/power-plants?state=${selectedState}&limit=${topN}`);
+      const response = await api.get(`/api/power-plants?state=${selectedState}&limit=${topN}`);
       setPlants(response.data);
       setError(null);
     } catch (err) {
@@ -103,7 +119,7 @@ function App() {
       setLoading(true);
       setUploadError(null);
       
-      const response = await axios.post('/api/power-plants/upload', formData, {
+      const response = await api.post('/api/power-plants/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -113,7 +129,7 @@ function App() {
         setUploadSuccess(true);
         
         // Refresh states list after successful upload
-        const statesResponse = await axios.get('/api/power-plants/states');
+        const statesResponse = await api.get('/api/power-plants/states');
         setStates(statesResponse.data);
       }
     } catch (err: any) {
@@ -144,10 +160,6 @@ function App() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h3" component="h1" gutterBottom align="center">
-        U.S. Power Plants Visualization
-      </Typography>
-      
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
         <Typography variant="h5" gutterBottom>
           Data Upload
@@ -331,4 +343,44 @@ function App() {
   )
 }
 
-export default App
+// Navigation bar component with auth state
+function NavigationBar() {
+  const { openSignIn } = useClerk();
+  const navigate = useNavigate();
+
+  return (
+    <AppBar position="static">
+      <Toolbar sx={{ justifyContent: 'space-between' }}>
+        <Typography variant="h6" component="div">
+          U.S. Power Plants Visualization
+        </Typography>
+        <Box>
+          <SignedIn>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
+          <SignedOut>
+            <Button 
+              color="inherit" 
+              onClick={() => openSignIn()}
+            >
+              Sign In
+            </Button>
+          </SignedOut>
+        </Box>
+      </Toolbar>
+    </AppBar>
+  );
+}
+
+function App() {
+  return (
+    <div className="App">
+      <NavigationBar />
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Dashboard />
+      </Container>
+    </div>
+  );
+}
+
+export default App;

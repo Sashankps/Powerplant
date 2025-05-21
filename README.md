@@ -9,6 +9,7 @@ A full-stack application for visualizing the annual net generation of U.S. power
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Setup and Installation](#setup-and-installation)
+  - [Authentication Setup](#authentication-setup)
 - [Usage](#usage)
 - [Handling Changing Requirements](#handling-changing-requirements)
 - [Monitoring](#monitoring)
@@ -21,6 +22,7 @@ A full-stack application for visualizing the annual net generation of U.S. power
 - **Filtering**: Filter power plants by U.S. state
 - **Configuration**: Specify the number of top plants to view
 - **Responsive UI**: Works on desktop and mobile devices
+- **Authentication**: Secure user authentication via Clerk
 
 ## Architecture
 
@@ -82,6 +84,37 @@ The application uses a microservices architecture with Docker containers:
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - MinIO Console: http://localhost:9001 (login with minioadmin/minioadmin)
+
+### Authentication Setup
+
+The application uses [Clerk](https://clerk.dev/) for authentication. Follow these steps to set up authentication:
+
+1. Create a Clerk account and a new application at https://dashboard.clerk.dev/
+2. Configure your Clerk application:
+   - Set up sign-in and sign-up methods
+   - Configure the JWT settings in the JWT Templates section
+   - Add your domain (e.g., localhost:5173 for development)
+
+3. Set the following environment variables:
+   - Frontend (.env file in the frontend directory):
+     ```
+     VITE_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+     VITE_API_URL=http://localhost:8000
+     ```
+   
+   - Backend (.env file in the backend directory):
+     ```
+     CLERK_PEM_PUBLIC_KEY=your_clerk_jwt_verification_key
+     # OR
+     CLERK_JWKS_URL=your_clerk_jwks_url
+     FRONTEND_URL=http://localhost:5173
+     ```
+
+4. Restart the application:
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
 
 ## Usage
 

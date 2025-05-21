@@ -1,12 +1,14 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from io import BytesIO
 import pandas as pd
 import os
 from botocore.exceptions import ClientError
+import boto3
+from minio import Minio
 
 from app.models import PowerPlant
-from app.services import get_s3_client, get_data_from_s3
+from app.services import get_s3_client, get_data_from_s3, S3_BUCKET_NAME
 from app.utils.data_cleaner import clean_csv_data, clean_excel_data, convert_to_api_format
 
 router = APIRouter(prefix="/api/power-plants", tags=["power-plants"])
@@ -15,7 +17,10 @@ router = APIRouter(prefix="/api/power-plants", tags=["power-plants"])
 states_cache = None
 
 @router.post("/upload")
-async def upload_csv(file: UploadFile = File(...), s3_client = Depends(get_s3_client)):
+async def upload_csv(
+    file: UploadFile = File(...), 
+    s3_client = Depends(get_s3_client)
+):
     """
     Upload a CSV file to S3 bucket.
     The file should follow the structure of the GEN23 sheet from EPA's eGRID dataset.
@@ -46,19 +51,33 @@ async def upload_csv(file: UploadFile = File(...), s3_client = Depends(get_s3_cl
         api_df.to_csv(buffer, index=False)
         buffer.seek(0)
         
-        # Upload to S3
-        s3_client.put_object(
-            Bucket=os.environ.get("S3_BUCKET_NAME", "power-viz"),
-            Key=f"cleaned_{file.filename.rsplit('.', 1)[0]}.csv",
-            Body=buffer.getvalue()
-        )
+        # Object key for the file
+        object_key = f"cleaned_{file.filename.rsplit('.', 1)[0]}.csv"
+        
+        # Upload to S3 - handle different client types
+        if isinstance(s3_client, Minio):
+            # For MinIO client
+            s3_client.put_object(
+                bucket_name=S3_BUCKET_NAME,
+                object_name=object_key,
+                data=buffer,
+                length=buffer.getbuffer().nbytes,
+                content_type='text/csv'
+            )
+        else:
+            # For boto3 client (default case)
+            s3_client.put_object(
+                Bucket=S3_BUCKET_NAME,
+                Key=object_key,
+                Body=buffer.getvalue()
+            )
         
         # Clear the cache to refresh data
         global states_cache
         states_cache = None
         
         return {
-            "filename": f"cleaned_{file.filename.rsplit('.', 1)[0]}.csv", 
+            "filename": object_key, 
             "status": "uploaded",
             "records_count": len(api_df)
         }
@@ -69,9 +88,11 @@ async def upload_csv(file: UploadFile = File(...), s3_client = Depends(get_s3_cl
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 @router.get("/states", response_model=List[str])
-async def get_states(s3_client = Depends(get_s3_client)):
+async def get_states(
+    s3_client = Depends(get_s3_client)
+):
     """
-    Get list of all available states in the dataset
+    Get list of all available states in the dataset.
     """
     global states_cache
     
@@ -101,7 +122,7 @@ async def get_plants(
     s3_client = Depends(get_s3_client)
 ):
     """
-    Get top N power plants by net generation for a specific state
+    Get top N power plants by net generation for a specific state.
     """
     try:
         data = await get_data_from_s3(s3_client)

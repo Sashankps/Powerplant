@@ -15,6 +15,9 @@ S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY", "minioadmin")
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "power-viz")
 S3_USE_SSL = os.environ.get("S3_USE_SSL", "False").lower() == "true"
 
+# Export the bucket name for use in other modules
+__all__ = ['get_s3_client', 'get_data_from_s3', 'S3_BUCKET_NAME']
+
 # Cache for the processed data
 data_cache = None
 data_cache_timestamp = None
@@ -54,8 +57,24 @@ async def get_data_from_s3(s3_client) -> pd.DataFrame:
             return data_cache
     
     # List all CSV files in the bucket
-    if isinstance(s3_client, boto3.client):
-        # boto3 client
+    if isinstance(s3_client, Minio):
+        # MinIO client
+        try:
+            objects = s3_client.list_objects(S3_BUCKET_NAME, recursive=True)
+            files = [obj.object_name for obj in objects if obj.object_name.endswith('.csv')]
+            
+            all_data = []
+            for file in files:
+                response = s3_client.get_object(S3_BUCKET_NAME, file)
+                file_content = response.read()
+                df = process_csv_data(BytesIO(file_content))
+                all_data.append(df)
+                
+        except Exception as e:
+            print(f"Error fetching data from MinIO: {e}")
+            return pd.DataFrame()
+    else:
+        # boto3 client (default case)
         try:
             response = s3_client.list_objects_v2(Bucket=S3_BUCKET_NAME)
             if 'Contents' not in response:
@@ -72,22 +91,6 @@ async def get_data_from_s3(s3_client) -> pd.DataFrame:
             
         except Exception as e:
             print(f"Error fetching data from S3: {e}")
-            return pd.DataFrame()
-    else:
-        # MinIO client
-        try:
-            objects = s3_client.list_objects(S3_BUCKET_NAME, recursive=True)
-            files = [obj.object_name for obj in objects if obj.object_name.endswith('.csv')]
-            
-            all_data = []
-            for file in files:
-                response = s3_client.get_object(S3_BUCKET_NAME, file)
-                file_content = response.read()
-                df = process_csv_data(BytesIO(file_content))
-                all_data.append(df)
-                
-        except Exception as e:
-            print(f"Error fetching data from MinIO: {e}")
             return pd.DataFrame()
     
     # Combine all data frames

@@ -23,6 +23,7 @@ A full-stack application for visualizing the annual net generation of U.S. power
 - **Configuration**: Specify the number of top plants to view
 - **Responsive UI**: Works on desktop and mobile devices
 - **Authentication**: Secure user authentication via Clerk
+- **Comprehensive Logging**: Application logs, error logs, and audit logs for security and compliance
 
 ## Architecture
 
@@ -153,6 +154,9 @@ The application could be monitored using the following strategies:
 ### Application Monitoring
 - **Prometheus and Grafana**: For metrics collection and visualization
 - **Logging**: Centralized logging with ELK stack (Elasticsearch, Logstash, Kibana)
+  - **Application Logs**: General application logs in `logs/app.log`
+  - **Error Logs**: Detailed error tracking in `logs/error.log`
+  - **Audit Logs**: Security and compliance audit trail in `logs/audit.log`
 - **Tracing**: Distributed tracing with Jaeger or Zipkin
 
 ### Infrastructure Monitoring

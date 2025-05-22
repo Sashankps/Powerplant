@@ -2,7 +2,7 @@ import pandas as pd
 from io import BytesIO
 import logging
 
-logger = logging.getLogger(__name__)
+from app.utils.logger import logger, log_audit
 
 def clean_dataframe(df):
     """
@@ -40,53 +40,15 @@ def clean_dataframe(df):
         # If columns are already in the new format, don't try to rename them
         else:
             logger.info("Columns seem to be already renamed or in a different format")
-            
-        # Handle missing values with appropriate defaults
-        fill_values = {
-            'Number of associated boilers': 0,
-            'Generator nameplate capacity (MW)': 0,
-            'Generator capacity factor': 0,
-            'Generator annual net generation (MWh)': 0,
-            'Generator ozone season net generation (MWh)': 0,
-            'Generator planned or actual retirement year': 0,
-            'Generator status': 'Unknown',
-            'Generator prime mover type': 'Unknown',
-            'Generator primary fuel': 'Unknown',
-            'Generation data source': 'Unknown'
-        }
         
-        # Only fill columns that exist
-        fill_dict = {k: v for k, v in fill_values.items() if k in df.columns}
-        if fill_dict:
-            df.fillna(fill_dict, inplace=True)
-        
-        # Remove duplicates
-        df.drop_duplicates(inplace=True)
-        
-        # Convert data types
-        type_conversions = {
-            'Data Year': 'int',
-            'Generator nameplate capacity (MW)': 'float',
-            'Generator capacity factor': 'float',
-            'Generator annual net generation (MWh)': 'float',
-            'Generator ozone season net generation (MWh)': 'float',
-            'Generator year on-line': 'int',
-            'Generator planned or actual retirement year': 'int'
-        }
-        
-        # Only convert columns that exist
-        for col, dtype in type_conversions.items():
-            if col in df.columns:
-                try:
-                    df[col] = df[col].astype(dtype, errors='ignore')
-                except Exception as e:
-                    logger.warning(f"Could not convert {col} to {dtype}: {e}")
-        
+        # Add audit log for data cleaning
+        log_audit("system", "PROCESS", "clean_dataframe", "SUCCESS", f"Processed {len(df)} rows")
         return df
-    
+        
     except Exception as e:
-        logger.error(f"Error cleaning dataframe: {e}")
-        # Return original dataframe if cleaning fails
+        logger.error(f"Error cleaning dataframe: {str(e)}")
+        log_audit("system", "PROCESS", "clean_dataframe", "FAILURE", f"Error: {str(e)}")
+        # Return original dataframe on error
         return df
 
 def clean_csv_data(file_content):
@@ -114,14 +76,17 @@ def clean_excel_data(file_content, sheet_name='GEN23'):
     try:
         # Read Excel file
         df = pd.read_excel(BytesIO(file_content), sheet_name=sheet_name)
+        log_audit("system", "PROCESS", f"excel_file:{sheet_name}", "STARTED")
         
         # Clean the data
         cleaned_df = clean_dataframe(df)
         
+        log_audit("system", "PROCESS", f"excel_file:{sheet_name}", "SUCCESS", f"Processed {len(cleaned_df)} rows")
         return cleaned_df
     
     except Exception as e:
         logger.error(f"Error processing Excel data: {e}")
+        log_audit("system", "PROCESS", f"excel_file:{sheet_name}", "FAILURE", f"Error: {str(e)}")
         # Return empty dataframe on error
         return pd.DataFrame()
 
